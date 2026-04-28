@@ -1,0 +1,188 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+void main() {
+  runApp(RecipeWebApp());
+}
+
+// ================= APP =================
+
+class RecipeWebApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: "Recipe Web App",
+      theme: ThemeData.dark(),
+      home: RecipeHome(),
+    );
+  }
+}
+
+// ================= MODEL =================
+
+class Recipe {
+  final String name;
+  final String image;
+  final String category;
+  final String instructions;
+
+  Recipe({
+    required this.name,
+    required this.image,
+    required this.category,
+    required this.instructions,
+  });
+
+  factory Recipe.fromJson(Map<String, dynamic> json) {
+    return Recipe(
+      name: json['strMeal'] ?? "",
+      image: json['strMealThumb'] ?? "",
+      category: json['strCategory'] ?? "",
+      instructions: json['strInstructions'] ?? "",
+    );
+  }
+}
+
+// ================= HOME SCREEN =================
+
+class RecipeHome extends StatefulWidget {
+  @override
+  State<RecipeHome> createState() => _RecipeHomeState();
+}
+
+class _RecipeHomeState extends State<RecipeHome> {
+  List<Recipe> recipes = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchRecipes();
+  }
+
+  // ================= API CALL =================
+
+  Future<void> fetchRecipes() async {
+    final url = Uri.parse(
+      "https://www.themealdb.com/api/json/v1/1/search.php?s=chicken",
+    );
+
+    try {
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        final List meals = data['meals'];
+
+        setState(() {
+          recipes = meals.map((e) => Recipe.fromJson(e)).toList();
+          loading = false;
+        });
+      } else {
+        setState(() {
+          loading = false;
+        });
+      }
+    } catch (e) {
+      print("Error: $e");
+      setState(() {
+        loading = false;
+      });
+    }
+  }
+
+  // ================= UI =================
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Recipe App 🍲 (Web)"),
+      ),
+      body: loading
+          ? Center(child: CircularProgressIndicator())
+          : GridView.builder(
+              padding: EdgeInsets.all(10),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3, // good for Chrome
+                childAspectRatio: 0.8,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: recipes.length,
+              itemBuilder: (context, index) {
+                final r = recipes[index];
+
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DetailPage(recipe: r),
+                      ),
+                    );
+                  },
+                  child: Card(
+                    elevation: 5,
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Image.network(
+                            r.image,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                          ),
+                        ),
+                        Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Text(
+                            r.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+// ================= DETAIL PAGE =================
+
+class DetailPage extends StatelessWidget {
+  final Recipe recipe;
+
+  DetailPage({required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(recipe.name),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Image.network(recipe.image),
+            SizedBox(height: 10),
+            Text(
+              recipe.category,
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(recipe.instructions),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
